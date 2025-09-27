@@ -50,15 +50,16 @@ export default function Navbar({ onRefresh }) {
           : "bg-transparent"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
-        {/* Logo & App Name */}
+      <div className="max-w-7xl mx-auto px-4 py-2 flex justify-between">
+        {/* Logo & App Name - create one div and inside that logo and company name should come and give style items start or justify start check this css*/}
+        
         <Link to="/home" className="flex items-center gap-2 font-bold text-xl text-indigo-700 dark:text-indigo-400">
           <span className="bg-indigo-600 text-white rounded-full px-2 py-1 text-lg">💹</span>
           FinSight <span className="hidden sm:inline">AI</span>
         </Link>
 
-        {/* Desktop Nav Links */}
-        <div className="hidden md:flex items-center gap-2">
+        {/* Desktop Nav Links - css - center*/}
+        <div className="hidden md:flex items-center gap-2 justify-center">
           {navLinks.map((link) => (
             <Link
               key={link.name}
@@ -90,6 +91,7 @@ export default function Navbar({ onRefresh }) {
             <FiLogOut size={22} />
           </button>
         </div>
+        <div className="justify-end items-end"></div>
 
         {/* Mobile Menu Button */}
         <div className="flex items-center gap-2 md:hidden">

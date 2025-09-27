@@ -482,7 +482,6 @@ function Onboarding() {
       case 2:
         return renderRiskAssessment();
       case 3:
-        return renderResults();
       default:
         return null;
     }
@@ -490,7 +489,7 @@ function Onboarding() {
 
   // Render profile step
   const renderProfileStep = () => (
-    <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-2xl">
+    <div className="bg-white p-8 rounded-lg shadow-md w-full justify-center items-center">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">
         Complete Your Profile
       </h2>
