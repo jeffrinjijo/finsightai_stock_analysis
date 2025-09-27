@@ -602,6 +602,89 @@ const generateDemoFinancialStatements = (type, limit, symbol) => {
   return periods;
 };
 
+/**
+ * Get real-time quotes for multiple symbols
+ * @param {Array<string>} symbols - Array of stock symbols
+ * @returns {Promise<Array>} Array of quote objects
+ */
+const getBatchQuotes = async (symbols) => {
+  try {
+    if (!symbols || !symbols.length) return [];
+    
+    // FMP API supports up to 25 symbols per request
+    const symbolList = symbols.join(',');
+    const response = await fmpApi.get(`/quote/${symbolList}`);
+    
+    // Transform the data to match our format
+    return response.data.map(quote => ({
+      symbol: quote.symbol,
+      name: quote.name,
+      price: quote.price,
+      change: quote.change,
+      changePercent: quote.changesPercentage,
+      volume: quote.volume,
+      marketCap: quote.marketCap,
+      peRatio: quote.pe,
+      sector: quote.sector || 'N/A',
+      exchange: quote.exchange,
+      timestamp: new Date()
+    }));
+  } catch (error) {
+    console.error('Error fetching batch quotes:', error);
+    // Generate demo data if API fails (for development)
+    if (process.env.NODE_ENV === 'development') {
+      return symbols.map(symbol => {
+        const basePrice = 100 + Math.random() * 100;
+        const change = (Math.random() - 0.5) * 5;
+        return {
+          symbol,
+          name: `${symbol} Company`,
+          price: basePrice,
+          change: change,
+          changePercent: (change / basePrice) * 100,
+          volume: Math.floor(Math.random() * 10000000) + 1000000,
+          marketCap: Math.floor(Math.random() * 1000000000000) + 1000000000,
+          peRatio: 10 + Math.random() * 30,
+          sector: ['Technology', 'Finance', 'Healthcare', 'Consumer', 'Industrial'][Math.floor(Math.random() * 5)],
+          exchange: 'NASDAQ',
+          timestamp: new Date()
+        };
+      });
+    }
+    throw error;
+  }
+};
+
+/**
+ * Get market indices data
+ * @returns {Promise<Array>} Array of market indices
+ */
+const getMarketIndices = async () => {
+  const indices = ['^GSPC', '^DJI', '^IXIC', '^VIX'];
+  try {
+    const response = await fmpApi.get(`/quote/${indices.join(',')}`);
+    return response.data.map(index => ({
+      symbol: index.symbol.replace('^', ''),
+      name: index.symbol === '^GSPC' ? 'S&P 500' : 
+            index.symbol === '^DJI' ? 'Dow Jones' :
+            index.symbol === '^IXIC' ? 'NASDAQ' : 'VIX',
+      price: index.price,
+      change: index.change,
+      changePercent: index.changesPercentage,
+      timestamp: new Date()
+    }));
+  } catch (error) {
+    console.error('Error fetching market indices:', error);
+    // Fallback to demo data
+    return [
+      { symbol: 'SPX', name: 'S&P 500', price: 4500 + Math.random() * 100, change: (Math.random() - 0.5) * 50, changePercent: (Math.random() - 0.5) * 2 },
+      { symbol: 'DJI', name: 'Dow Jones', price: 35000 + Math.random() * 1000, change: (Math.random() - 0.5) * 100, changePercent: (Math.random() - 0.5) * 1.5 },
+      { symbol: 'IXIC', name: 'NASDAQ', price: 14000 + Math.random() * 500, change: (Math.random() - 0.5) * 40, changePercent: (Math.random() - 0.5) * 2.5 },
+      { symbol: 'VIX', name: 'Volatility', price: 18 + Math.random() * 5, change: (Math.random() - 0.5) * 2, changePercent: (Math.random() - 0.5) * 10 }
+    ];
+  }
+};
+
 // Export all API functions
 export default {
   getQuote,
@@ -610,5 +693,7 @@ export default {
   getCompanyProfile,
   getFinancialStatements,
   getMarketNews,
+  getBatchQuotes,
+  getMarketIndices,
   // Add any other functions that should be part of the public API
 };

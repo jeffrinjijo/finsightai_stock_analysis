@@ -1,6 +1,6 @@
 // Example: src/components/Navbar.js
 import { useContext } from "react";
-import { ThemeContext } from "../context/ThemeContext";
+import { ThemeContext } from "../context/ThemeContext.jsxundefined;
 
 function Navbar() {
   const { theme, toggleTheme } = useContext(ThemeContext);

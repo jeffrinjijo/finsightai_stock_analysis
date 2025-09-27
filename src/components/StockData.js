@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getQuote, getHistoricalData } from '../api/stockApi';
+import { getQuote, getHistoricalData } from '../api/stockApi.jsxundefined;
 
 const StockData = ({ symbol = 'AAPL' }) => {
   const [stockData, setStockData] = useState(null);

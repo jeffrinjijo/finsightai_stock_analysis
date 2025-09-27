@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { FiSearch, FiX } from 'react-icons/fi';
-import { searchStocks as fetchStocksFromAPI } from '../utils/fmpApi';
+import fmpApi from '../utils/fmpApi';
 
 const StockSearch = ({ onSelectStock, selectedStocks = [] }) => {
   const [query, setQuery] = useState('');
@@ -17,7 +17,7 @@ const StockSearch = ({ onSelectStock, selectedStocks = [] }) => {
     
     setIsLoading(true);
     try {
-      const apiResults = await fetchStocksFromAPI(searchQuery);
+      const apiResults = await fmpApi.searchStocks(searchQuery);
       setResults(apiResults || []);
       setIsDropdownOpen(apiResults && apiResults.length > 0);
     } catch (error) {

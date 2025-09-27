@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { fetchStockData } from "../utils/api";
+import { fetchStockData } from "../utils/api.jsxundefined;
 import { FiTrendingUp, FiTrendingDown, FiDollarSign, FiPercent, FiBarChart2, FiActivity } from "react-icons/fi";
 import {
   LineChart,

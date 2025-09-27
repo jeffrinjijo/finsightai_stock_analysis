@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getQuote, getHistoricalData, getCompanyProfile } from '../api/stockApi';
+import { getQuote, getHistoricalData, getCompanyProfile } from '../api/stockApi.jsxundefined;
 
 // Helper function to compare arrays
 const arraysEqual = (a, b) => {

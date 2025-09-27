@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   FiArrowRight, 
@@ -14,6 +14,7 @@ import {
   FiTrendingUp as FiTrendingUpIcon,
   FiTrendingDown as FiTrendingDownIcon
 } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
 import useStocks from '../hooks/useStocks';
 
 // Modern card component

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getQuote, getHistoricalData } from '../api/stockApi';
+import { getQuote, getHistoricalData } from '../api/stockApi.jsxundefined;
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 

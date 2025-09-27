@@ -1,592 +1,620 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiTrendingUp, FiTrendingDown, FiDollarSign, FiRefreshCw } from "react-icons/fi";
+import { FiTrendingUp, FiTrendingDown, FiDollarSign, FiRefreshCw, FiSearch, FiBarChart2, FiArrowUp, FiArrowDown } from "react-icons/fi";
+import stockData from "../data/stockData";
 import {
   ResponsiveContainer,
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend
+  Legend,
+  ReferenceLine,
+  Brush,
+  Cell,
+  PieChart,
+  Pie,
+  Sector
 } from 'recharts';
-import { useFMPStocks } from '../hooks/useFMPStocks';
+import { useAuth } from '../context/AuthContext';
+import { 
+  Select, 
+  MenuItem, 
+  TextField, 
+  Button, 
+  Box, 
+  Typography, 
+  Paper, 
+  InputAdornment, 
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Slider,
+  Tab,
+  Tabs,
+  Card,
+  CardContent,
+  Divider,
+  Chip,
+  Avatar,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
+  Switch,
+  FormControlLabel
+} from '@mui/material';
+import { styled } from '@mui/material/styles';
 
-// Default stocks to show
-const defaultStocks = [
-  { symbol: "AAPL", name: "Apple Inc." },
-  { symbol: "MSFT", name: "Microsoft" },
-  { symbol: "GOOGL", name: "Alphabet" },
-  { symbol: "AMZN", name: "Amazon" },
-  { symbol: "META", name: "Meta" },
-  { symbol: "TSLA", name: "Tesla" },
-  { symbol: "NVDA", name: "NVIDIA" },
-  { symbol: "JPM", name: "JPMorgan" },
-  { symbol: "V", name: "Visa" },
-  { symbol: "NFLX", name: "Netflix" }
-];
+// Styled Components
+const StyledCard = styled(Card)(({ theme }) => ({
+  borderRadius: '12px',
+  boxShadow: '0 4px 20px 0 rgba(0,0,0,0.05)',
+  transition: 'transform 0.3s ease-in-out',
+  '&:hover': {
+    transform: 'translateY(-4px)'
+  },
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  backgroundColor: theme.palette.mode === 'dark' ? '#1E293B' : '#FFFFFF',
+}));
+
+const StyledButton = styled(Button)(({ theme }) => ({
+  textTransform: 'none',
+  borderRadius: '8px',
+  fontWeight: 600,
+  padding: '10px 20px',
+  boxShadow: '0 2px 10px 0 rgba(0,0,0,0.1)',
+  '&:hover': {
+    boxShadow: '0 4px 12px 0 rgba(0,0,0,0.15)',
+  },
+}));
+
+// Use the imported stock data
+const defaultStocks = stockData.map(stock => ({
+  symbol: stock.symbol,
+  name: stock.name,
+  sector: stock.sector,
+  price: stock.price,
+  dayChange: stock.dayChange,
+  weekReturn: stock.weekReturn,
+  monthReturn: stock.monthReturn,
+  marketCap: stock.marketCap,
+  peRatio: stock.peRatio,
+  dividendYield: stock.dividendYield,
+  historicalData: stock.historicalData || Array.from({ length: 30 }, (_, i) => ({
+    date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    price: Math.round((stock.price * (1 + (Math.random() * 0.1 - 0.05))) * 100) / 100,
+    volume: Math.floor(Math.random() * 10000) + 1000
+  }))
+}));
+
+// Date formatter
+const formatDate = (dateString) => {
+  const options = { year: 'numeric', month: 'short', day: 'numeric' };
+  return new Date(dateString).toLocaleDateString('en-US', options);
+};
+
+// Custom tooltip for the chart
+const CustomTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+        <p className="font-medium text-gray-900 dark:text-white">{formatDate(label)}</p>
+        <p className="text-sm">
+          <span className="text-gray-600 dark:text-gray-300">Price: </span>
+          <span className="font-medium">${payload[0].value.toFixed(2)}</span>
+        </p>
+        {payload[1] && (
+          <p className="text-sm">
+            <span className="text-gray-600 dark:text-gray-300">Volume: </span>
+            <span className="font-medium">{payload[1].value.toLocaleString()}</span>
+          </p>
+        )}
+      </div>
+    );
+  }
+  return null;
+};
 
 function Simulate() {
-  const [selectedStock, setSelectedStock] = useState(null);
-  const [amount, setAmount] = useState("");
-  const [result, setResult] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [error, setError] = useState(null);
   const navigate = useNavigate();
-  
-  // Get stock symbols from default stocks
-  const stockSymbols = useMemo(() => defaultStocks.map(stock => stock.symbol), []);
-  
-  // Use the useFMPStocks hook to manage stock data
-  const { 
-    stocks: allStocks, 
-    loading, 
-    error: stocksError, 
-    refreshStock,
-    hasData: hasStocksData
-  } = useFMPStocks(stockSymbols);
-  
-  // Calculate average profit
-  const avgProfit = useMemo(() => {
-    if (history.length === 0) return 0;
-    const total = history.reduce((sum, item) => sum + item.profit, 0);
-    return (total / history.length).toFixed(2);
-  }, [history]);
-  
-  // Get chart data for selected stock
-  const chartData = useMemo(() => {
-    if (!selectedStock) return [];
-    const stock = allStocks.find(s => s.symbol === selectedStock.symbol);
-    if (!stock || !stock.historicalData) return [];
-    
-    return stock.historicalData.map(item => ({
-      date: item.date,
-      price: item.close || item.price,
-      volume: item.volume,
-      open: item.open,
-      high: item.high,
-      low: item.low,
-      close: item.close || item.price
-    }));
-  }, [selectedStock, allStocks]);
-  
-  // Get current price data for selected stock
-  const currentPriceData = useMemo(() => {
-    if (!selectedStock) return null;
-    const stock = allStocks.find(s => s.symbol === selectedStock.symbol);
-    if (!stock) return null;
-    
-    return {
-      price: stock.currentPrice || 0,
-      changePercent: stock.changePercent || 0,
-      change: stock.change || 0,
-    };
-  }, [selectedStock, allStocks]);
-  
-  // Handle stock refresh
-  const handleRefresh = useCallback(async () => {
-    if (!selectedStock) return;
-    try {
-      await refreshStock(selectedStock.symbol);
-    } catch (err) {
-      console.error('Error refreshing stock data:', err);
-    }
-  }, [selectedStock, refreshStock]);
-  
-  // Set initial selected stock when data loads
-  useEffect(() => {
-    if (allStocks.length > 0 && !selectedStock) {
-      setSelectedStock({
-        symbol: allStocks[0].symbol,
-        name: allStocks[0].name
-      });
-    }
-  }, [allStocks, selectedStock]);
-  
-  // Filter stocks based on search query
+  const [selectedStock, setSelectedStock] = useState(defaultStocks[0]);
+  const [investmentAmount, setInvestmentAmount] = useState(1000);
+  const [timePeriod, setTimePeriod] = useState(12);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationResults, setSimulationResults] = useState(null);
+  const [tabValue, setTabValue] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Filter stocks based on search term
   const filteredStocks = useMemo(() => {
-    if (!searchQuery) return allStocks.map(stock => ({
-      symbol: stock.symbol,
-      name: stock.name
-    }));
-    
-    const query = searchQuery.toLowerCase();
-    return allStocks
-      .filter(stock => 
-        stock.symbol.toLowerCase().includes(query) ||
-        stock.name.toLowerCase().includes(query)
-      )
-      .map(stock => ({
-        symbol: stock.symbol,
-        name: stock.name
-      }));
-  }, [searchQuery, allStocks]);
+    if (!searchTerm) return defaultStocks;
+    const term = searchTerm.toLowerCase();
+    return defaultStocks.filter(stock => 
+      stock.name.toLowerCase().includes(term) || 
+      stock.symbol.toLowerCase().includes(term)
+    );
+  }, [searchTerm]);
 
   // Format currency
   const formatCurrency = (value) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-IN', {
       style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(value);
   };
 
-  // Load history from localStorage
-  useEffect(() => {
-    const savedHistory = JSON.parse(localStorage.getItem("finsightSimulationHistory")) || [];
-    setHistory(savedHistory);
-  }, []);
-
-  // Handle simulation
-  const handleSimulate = () => {
-    if (!selectedStock || !amount) {
-      setError("Please select a stock and enter an amount");
-      return;
-    }
-    
-    const dailyChange = currentPriceData.changePercent;
-    const investment = parseFloat(amount);
-    const profit = (investment * dailyChange) / 100;
-    
-    const simulationResult = {
-      id: Date.now(),
-      symbol: selectedStock.symbol,
-      amount: investment,
-      profit,
-      date: new Date().toISOString(),
-      price: currentPriceData.price,
-      changePercent: dailyChange
-    };
-    
-    const newHistory = [simulationResult, ...history].slice(0, 50);
-    setHistory(newHistory);
-    localStorage.setItem("finsightSimulationHistory", JSON.stringify(newHistory));
-    setResult(simulationResult);
+  // Handle stock selection
+  const handleStockSelect = (symbol) => {
+    const stock = defaultStocks.find(s => s.symbol === symbol);
+    if (stock) setSelectedStock(stock);
   };
 
-  // Clear simulation history
-  const handleClearHistory = () => {
-    if (window.confirm("Are you sure you want to clear all simulation history?")) {
-      localStorage.removeItem("finsightSimulationHistory");
-      setHistory([]);
-      setResult(null);
-    }
+  // Run simulation
+  const runSimulation = () => {
+    setIsSimulating(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      const result = {
+        initialInvestment: investmentAmount,
+        finalValue: investmentAmount * (1 + (selectedStock.monthReturn / 100 * timePeriod)),
+        profit: (investmentAmount * (selectedStock.monthReturn / 100 * timePeriod)),
+        timePeriod,
+        chartData: selectedStock.historicalData.map((data, i) => ({
+          date: data.date,
+          price: data.price,
+          value: investmentAmount * (1 + (selectedStock.monthReturn / 100 * (i / selectedStock.historicalData.length * timePeriod)))
+        }))
+      };
+      
+      setSimulationResults(result);
+      setIsSimulating(false);
+    }, 1000);
   };
 
-  // Calculate simulation statistics
-  const simulationStats = useMemo(() => {
-    const stats = {
-      winningTrades: 0,
-      losingTrades: 0,
-      winRate: 0
-    };
-
-    if (history.length > 0) {
-      stats.winningTrades = history.filter(item => item.profit >= 0).length;
-      stats.losingTrades = history.length - stats.winningTrades;
-      stats.winRate = (stats.winningTrades / history.length) * 100;
-    }
-
-    return stats;
-  }, [history]);
-
-  const totalSimulations = history.length;
-  const netProfit = history.reduce((sum, item) => sum + item.profit, 0);
+  // Calculate percentage change
+  const calculateChange = (current, previous) => {
+    return ((current - previous) / previous * 100).toFixed(2);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Stock Simulation
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Simulate stock investments and track potential returns
-          </p>
+      <div className="max-w-7xl mx-auto h-full flex flex-col">
+        {/* Header Section */}
+        <div className="mb-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+                Stock Simulation
+              </h1>
+              <p className="text-gray-600 dark:text-gray-300 text-sm">
+                Simulate stock investments and track potential returns
+              </p>
+            </div>
+            <Button 
+              variant="contained" 
+              color="primary"
+              startIcon={<FiRefreshCw />}
+              onClick={() => window.location.reload()}
+            >
+              Reset
+            </Button>
+          </div>
+          
+          <Divider className="my-4" />
         </div>
         
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Panel - Stock Selection */}
-          <div className="lg:col-span-1 space-y-4">
-            <div className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h2 className="font-semibold text-lg mb-4">
-                Stock Selection
-              </h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Search Stock
-                  </label>
-                  <div className="relative">
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-hidden">
+          {/* Left Column - Stock Selection and Controls */}
+          <div className="w-full lg:w-2/3 flex flex-col gap-6 h-full">
+            {/* Stock Selection Card */}
+            <StyledCard>
+              <CardContent className="flex-1 flex flex-col">
+                <div className="flex justify-between items-center mb-4">
+                  <Typography variant="h6" className="font-semibold text-gray-800 dark:text-white">
+                    Select Stock
+                  </Typography>
+                  <div className="relative w-64">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <FiSearch className="text-gray-400" />
+                    </div>
                     <input
                       type="text"
-                      placeholder="Search by symbol or name..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full p-3 pr-10 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      disabled={loading}
+                      className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="Search stocks..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
                     />
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                  </div>
-                  
-                  <div className="max-h-60 overflow-y-auto pr-1 -mr-1 mt-2">
-                    {filteredStocks.map((stock) => (
-                      <button
-                        key={stock.symbol}
-                        onClick={() => setSelectedStock(stock)}
-                        className={`w-full text-left p-3 rounded-lg mb-2 transition-colors ${
-                          selectedStock?.symbol === stock.symbol
-                            ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800'
-                            : 'hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent hover:border-gray-200 dark:hover:border-gray-600'
-                        }`}
-                        disabled={loading}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium text-gray-900 dark:text-white">{stock.symbol}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {stock.name}
-                            </div>
-                          </div>
-                          {allStocks[stock.symbol]?.currentPrice && (
-                            <div className="text-right">
-                              <div className="font-medium text-gray-900 dark:text-white">
-                                {formatCurrency(allStocks[stock.symbol].currentPrice)}
-                              </div>
-                              <div className={`text-xs ${
-                                allStocks[stock.symbol].changePercent >= 0
-                                  ? 'text-green-600 dark:text-green-400'
-                                  : 'text-red-600 dark:text-red-400'
-                              }`}>
-                                {allStocks[stock.symbol].changePercent >= 0 ? '+' : ''}
-                                {allStocks[stock.symbol].changePercent?.toFixed(2) || '0.00'}%
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    ))}
                   </div>
                 </div>
-
-                {selectedStock && currentPriceData && (
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-lg text-gray-900 dark:text-white">{selectedStock.symbol}</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-300">{selectedStock.name}</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6 max-h-80 overflow-y-auto p-2">
+                  {filteredStocks.map((stock) => (
+                    <div 
+                      key={stock.symbol}
+                      className={`p-4 rounded-lg border cursor-pointer transition-all ${selectedStock?.symbol === stock.symbol 
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30' 
+                        : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'}`}
+                      onClick={() => handleStockSelect(stock.symbol)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-medium text-gray-900 dark:text-white">{stock.symbol}</h4>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{stock.name}</p>
+                        </div>
+                        <Chip 
+                          label={stock.sector} 
+                          size="small" 
+                          className="text-xs"
+                          color="primary"
+                          variant="outlined"
+                        />
                       </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-gray-900 dark:text-white">
-                          {formatCurrency(currentPriceData.price)}
-                        </div>
-                        <div className={`text-sm flex items-center justify-end ${
-                          currentPriceData.changePercent >= 0 
-                            ? 'text-green-600 dark:text-green-400' 
-                            : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {currentPriceData.changePercent >= 0 ? (
-                            <FiTrendingUp className="mr-1" />
-                          ) : (
-                            <FiTrendingDown className="mr-1" />
-                          )}
-                          {Math.abs(currentPriceData.changePercent).toFixed(2)}%
-                        </div>
+                      <div className="mt-2 flex justify-between items-center">
+                        <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                          ${stock.price.toFixed(2)}
+                        </span>
+                        <span className={`text-sm font-medium ${stock.dayChange >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {stock.dayChange >= 0 ? '+' : ''}{stock.dayChange}%
+                        </span>
                       </div>
                     </div>
-                  </div>
-                )}
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Investment Amount ($)
-                    </label>
-                    <div className="relative rounded-md shadow-sm">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <FiDollarSign className="h-5 w-5 text-gray-400" />
-                      </div>
-                      <input
+                  ))}
+                </div>
+                
+                <div className="mt-auto">
+                  <Divider className="my-4" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Typography variant="subtitle2" className="mb-2 text-gray-700 dark:text-gray-300">
+                        Investment Amount
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        variant="outlined"
                         type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.00"
-                        className="block w-full pl-10 pr-12 py-3 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        min="0"
-                        step="0.01"
-                        disabled={!selectedStock || loading}
+                        value={investmentAmount}
+                        onChange={(e) => setInvestmentAmount(Number(e.target.value))}
+                        InputProps={{
+                          startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                          inputProps: { min: 100, step: 100 }
+                        }}
+                      />
+                      <Slider
+                        value={investmentAmount}
+                        onChange={(_, value) => setInvestmentAmount(value)}
+                        min={100}
+                        max={100000}
+                        step={100}
+                        valueLabelDisplay="auto"
+                        valueLabelFormat={(value) => `$${value.toLocaleString()}`}
+                        className="mt-2"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Typography variant="subtitle2" className="mb-2 text-gray-700 dark:text-gray-300">
+                        Time Period (Months)
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        variant="outlined"
+                        type="number"
+                        value={timePeriod}
+                        onChange={(e) => setTimePeriod(Number(e.target.value))}
+                        InputProps={{
+                          endAdornment: <InputAdornment position="end">months</InputAdornment>,
+                          inputProps: { min: 1, max: 60 }
+                        }}
+                      />
+                      <Slider
+                        value={timePeriod}
+                        onChange={(_, value) => setTimePeriod(value)}
+                        min={1}
+                        max={60}
+                        valueLabelDisplay="auto"
+                        valueLabelFormat={(value) => `${value} mo`}
+                        className="mt-2"
                       />
                     </div>
                   </div>
-
-                  <button
-                    onClick={handleSimulate}
-                    disabled={!selectedStock || !amount || loading}
-                    className={`w-full py-3 px-4 rounded-lg font-medium text-white transition-colors ${
-                      !selectedStock || !amount || loading
-                        ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700'
-                    }`}
-                  >
-                    {loading ? 'Simulating...' : 'Run Simulation'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 p-5 rounded-xl border border-gray-200 dark:border-gray-700">
-              <h2 className="font-semibold text-lg mb-4">Simulation Stats</h2>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Total Simulations</p>
-                    <p className="text-xl font-bold text-gray-900 dark:text-white">{history.length}</p>
-                  </div>
-                  <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Net Profit/Loss</p>
-                    <p className={`text-xl font-bold ${
-                      netProfit >= 0 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {formatCurrency(netProfit)}
-                    </p>
+                  
+                  <div className="mt-6">
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      color="primary"
+                      size="large"
+                      onClick={runSimulation}
+                      disabled={isSimulating || !selectedStock}
+                      startIcon={isSimulating ? <CircularProgress size={20} color="inherit" /> : <FiBarChart2 />}
+                    >
+                      {isSimulating ? 'Simulating...' : 'Run Simulation'}
+                    </Button>
                   </div>
                 </div>
-              </div>
-            </div>
-
-              {/* Simulation History */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
-                <div className="p-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-semibold">Simulation History</h2>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      Showing {Math.min(history.length, 5)} of {history.length}
-                    </span>
+              </CardContent>
+            </StyledCard>
+            
+            {/* Simulation Results */}
+            {simulationResults && (
+              <StyledCard>
+                <CardContent>
+                  <Typography variant="h6" className="font-semibold mb-4 text-gray-800 dark:text-white">
+                    Simulation Results
+                  </Typography>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                      <Typography variant="subtitle2" className="text-blue-700 dark:text-blue-300">
+                        Initial Investment
+                      </Typography>
+                      <Typography variant="h5" className="font-bold text-blue-900 dark:text-white">
+                        {formatCurrency(simulationResults.initialInvestment)}
+                      </Typography>
+                    </div>
+                    
+                    <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                      <Typography variant="subtitle2" className="text-green-700 dark:text-green-300">
+                        Final Value
+                      </Typography>
+                      <Typography variant="h5" className="font-bold text-green-900 dark:text-white">
+                        {formatCurrency(simulationResults.finalValue)}
+                      </Typography>
+                    </div>
+                    
+                    <div className={`p-4 rounded-lg ${simulationResults.profit >= 0 ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+                      <Typography variant="subtitle2" className={simulationResults.profit >= 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'}>
+                        {simulationResults.profit >= 0 ? 'Profit' : 'Loss'}
+                      </Typography>
+                      <Typography 
+                        variant="h5" 
+                        className={`font-bold ${simulationResults.profit >= 0 ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}
+                      >
+                        {simulationResults.profit >= 0 ? '+' : ''}{formatCurrency(simulationResults.profit)} 
+                        <span className="text-sm ml-2">
+                          ({calculateChange(simulationResults.finalValue, simulationResults.initialInvestment)}%)
+                        </span>
+                      </Typography>
+                    </div>
                   </div>
                   
-                  {history.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead className="bg-gray-50 dark:bg-gray-700">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Stock
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Amount
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              P/L
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                              Date
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                          {history.slice(0, 5).map((sim, index) => (
-                            <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
-                              <td className="px-4 py-3 whitespace-nowrap">
-                                <div className="font-medium">{sim.symbol}</div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">{sim.name}</div>
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-right">
-                                {formatCurrency(sim.amount)}
-                              </td>
-                              <td className={`px-4 py-3 whitespace-nowrap text-right ${
-                                sim.profit >= 0 ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {sim.profit >= 0 ? '+' : ''}{formatCurrency(sim.profit)}
-                                <span className="text-xs ml-1">
-                                  ({sim.change >= 0 ? '+' : ''}{sim.change.toFixed(2)}%)
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-gray-500 dark:text-gray-400">
-                                {new Date(sim.date).toLocaleDateString()}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  <div className="h-80 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={simulationResults.chartData}>
+                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                        <XAxis 
+                          dataKey="date" 
+                          tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        />
+                        <YAxis />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Legend />
+                        <Line 
+                          type="monotone" 
+                          dataKey="value" 
+                          name="Portfolio Value" 
+                          stroke="#3B82F6" 
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ r: 6 }}
+                        />
+                        <ReferenceLine y={simulationResults.initialInvestment} stroke="#10B981" strokeDasharray="3 3" />
+                        <Brush dataKey="date" height={30} stroke="#8884d8" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </StyledCard>
+            )}
+          </div>
+          
+          {/* Right Column - Charts and Info */}
+          <div className="w-full lg:w-1/3 flex flex-col gap-6 h-full">
+            {/* Selected Stock Info */}
+            <StyledCard>
+              <CardContent>
+                {selectedStock ? (
+                  <>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <Typography variant="h6" className="font-bold text-gray-900 dark:text-white">
+                          {selectedStock.name} ({selectedStock.symbol})
+                        </Typography>
+                        <Chip 
+                          label={selectedStock.sector} 
+                          size="small" 
+                          color="primary"
+                          variant="outlined"
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="text-right">
+                        <Typography variant="h5" className="font-bold text-gray-900 dark:text-white">
+                          ${selectedStock.price.toFixed(2)}
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          className={`font-medium ${selectedStock.dayChange >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                        >
+                          {selectedStock.dayChange >= 0 ? '+' : ''}{selectedStock.dayChange}% today
+                        </Typography>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      <p>No simulation history yet. Run a simulation to see results here.</p>
+                    
+                    <Divider className="my-4" />
+                    
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-300">Market Cap</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {formatCurrency(selectedStock.marketCap)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-300">P/E Ratio</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {selectedStock.peRatio.toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-300">Dividend Yield</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {selectedStock.dividendYield}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-300">52W High</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          ${(selectedStock.price * 1.15).toFixed(2)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-300">52W Low</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          ${(selectedStock.price * 0.85).toFixed(2)}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                </div>
-                
-                {history.length > 5 && (
-                  <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-3 bg-gray-50 dark:bg-gray-700/50 text-right">
-                    <button 
-                      onClick={() => navigate('/history')}
-                      className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                    >
-                      View All History →
-                    </button>
+                  </>
+                ) : (
+                  <Typography>Select a stock to view details</Typography>
+                )}
+              </CardContent>
+            </StyledCard>
+            
+            {/* Price Chart */}
+            <StyledCard>
+              <CardContent>
+                <Typography variant="h6" className="font-semibold mb-4 text-gray-800 dark:text-white">
+                  Price History (30 Days)
+                </Typography>
+                {selectedStock ? (
+                  <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={selectedStock.historicalData}>
+                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                        <XAxis 
+                          dataKey="date" 
+                          tickFormatter={(date) => new Date(date).getDate()}
+                        />
+                        <YAxis domain={['auto', 'auto']} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Line 
+                          type="monotone" 
+                          dataKey="price" 
+                          name="Price" 
+                          stroke="#8884d8" 
+                          strokeWidth={2}
+                          dot={false}
+                          activeDot={{ r: 6 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center text-gray-500">
+                    Select a stock to view price history
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-        </div>
-      
-      <div className="mt-6">
-      <div className="border rounded-lg p-4">
-        <h3 className="font-semibold mb-4">30-Day Price Trend</h3>
-        {loading ? (
-          <div className="h-64 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-          </div>
-        ) : chartData && chartData.length > 0 ? (
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(value) => {
-                    const date = new Date(value);
-                    return `${date.getMonth() + 1}/${date.getDate()}`;
-                  }}
-                />
-                <YAxis 
-                  domain={['auto', 'auto']}
-                  tickFormatter={(value) => `$${value.toFixed(2)}`}
-                  width={100}
-                />
-                <Tooltip 
-                  formatter={(value) => [`$${value.toFixed(2)}`, 'Price']}
-                  labelFormatter={(label) => `Date: ${label}`}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="price" 
-                  stroke="#4f46e5" 
-                  strokeWidth={2}
-                  dot={false}
-                  name="Price"
-                />
-                <Legend />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          ) : (
-            <div className="h-64 flex items-center justify-center text-gray-500">
-              No price data available
-            </div>
-          )}
-        </div>
-
-        {result && (
-          <div className="mt-6 text-center">
-            <p className="text-gray-700">📊 Invested: ₹{result.amount}</p>
-            <p className={`text-lg font-bold ${result.profit >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {result.profit >= 0 ? "Profit" : "Loss"}: ₹{result.profit}
-            </p>
-            <p className="text-gray-700">
-              Total Value: ₹{(result.amount + result.profit).toFixed(2)}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Simulation History + Insights */}
-      {history.length > 0 && (
-        <div className="mt-8 bg-white p-6 rounded-xl shadow w-full max-w-md">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-semibold text-gray-800">🕓 Simulation History</h3>
-            <button
-              onClick={handleClearHistory}
-              className="text-sm text-red-500 underline"
-            >
-              Clear All
-            </button>
-          </div>
-
-          {/* Insight Summary */}
-          <div className="mb-4 bg-blue-50 p-4 rounded-xl text-sm text-blue-900">
-            <p><strong>Total Simulations:</strong> {totalSimulations}</p>
-            <p><strong>Average Profit/Loss:</strong> ₹{avgProfit}</p>
-            <p>
-              <strong>Net Result:</strong>{" "}
-              <span className={netProfit >= 0 ? "text-green-600" : "text-red-600"}>
-                ₹{netProfit.toFixed(2)}
-              </span>
-            </p>
-          </div>
-
-          <ul className="space-y-2 max-h-64 overflow-y-auto text-sm">
-            {history.map((entry, index) => (
-              <li key={index} className="border-b pb-2">
-                <p>
-                  <strong>{entry.stock}</strong> ({entry.change > 0 ? "+" : ""}{entry.change}%)
-                  — ₹{entry.amount} ➜ {entry.profit >= 0 ? "+" : ""}₹{entry.profit}
-                </p>
-                <p className="text-gray-500">{entry.date}</p>
-              </li>
-            ))}
-          </ul>
-
-          {/* Profit Trend Chart */}
-          {history.length >= 2 && (
-            <div className="mt-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">📈 Profit Trend</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <LineChart
-                  data={history
-                    .map((item, index) => ({
-                      id: index + 1,
-                      profit: item.profit,
-                      label: new Date(item.date).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                      }),
-                    }))
-                    .reverse()}
+              </CardContent>
+            </StyledCard>
+            
+            {/* Recent Transactions / News */}
+            <StyledCard>
+              <CardContent>
+                <Tabs 
+                  value={tabValue} 
+                  onChange={(_, newValue) => setTabValue(newValue)}
+                  variant="fullWidth"
+                  className="mb-4"
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="profit"
-                    stroke="#2563eb"
-                    strokeWidth={3}
-                    dot={{ r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+                  <Tab label="News" />
+                  <Tab label="Transactions" />
+                </Tabs>
+                
+                {tabValue === 0 ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((item) => (
+                      <div key={item} className="border-b border-gray-200 dark:border-gray-700 pb-3 last:border-0 last:pb-0">
+                        <h4 className="font-medium text-gray-900 dark:text-white line-clamp-2">
+                          {selectedStock?.name || 'Company'} announces Q{Math.ceil(Math.random() * 4)} {new Date().getFullYear()} results
+                        </h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                        </p>
+                        <span className="text-xs text-gray-400 mt-1 block">
+                          {Math.ceil(Math.random() * 24)} hours ago • {['Bloomberg', 'Reuters', 'CNBC'][Math.floor(Math.random() * 3)]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((item) => {
+                      const isBuy = Math.random() > 0.5;
+                      const amount = (Math.random() * 1000 + 100).toFixed(2);
+                      const shares = (Math.random() * 10 + 1).toFixed(2);
+                      const price = (amount / shares).toFixed(2);
+                      
+                      return (
+                        <div key={item} className="flex justify-between items-center p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <div>
+                            <div className="flex items-center">
+                              <div className={`w-2 h-2 rounded-full mr-2 ${isBuy ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                              <span className="font-medium text-sm">{isBuy ? 'BUY' : 'SELL'}</span>
+                            </div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {new Date().toLocaleDateString()}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <div className={`font-medium ${isBuy ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {isBuy ? '+' : '-'}${amount}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {shares} shares @ ${price}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </StyledCard>
+          </div>
         </div>
-      )}
-
-      <div className="mt-6">
-        <button
-          onClick={() => navigate("/dashboard")}
-          className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-        >
-          ← Back to Dashboard
-        </button>
+        
+        {/* Back to Dashboard Button */}
+        <div className="mt-8 text-center">
+          <Button
+            variant="outlined"
+            color="primary"
+            onClick={() => navigate("/dashboard")}
+            className="text-sm"
+            startIcon={<FiDollarSign />}
+          >
+            Back to Dashboard
+          </Button>
+        </div>
       </div>
     </div>
   );

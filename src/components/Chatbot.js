@@ -65,10 +65,14 @@ const Chatbot = () => {
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://localhost:5001/api/chat', {
+      // Get the authentication token from localStorage
+      const token = localStorage.getItem('token') || 'test-token'; // Fallback for development
+      
+      const response = await fetch('http://localhost:5001/api/v1/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           message: messageText,
@@ -83,10 +87,17 @@ const Chatbot = () => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to get response from AI');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(errorData.error || 'Failed to get response from AI');
       }
       
       const data = await response.json();
+      console.log('API Response:', data);
       
       return data.response;
     } catch (error) {

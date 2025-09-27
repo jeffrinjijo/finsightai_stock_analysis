@@ -1,81 +1,110 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 
+// Helper: format date/time as “X hours ago”, etc.
+const timeAgo = (dateString) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} days ago`;
+};
+
 const fetchNews = async (symbols = []) => {
-  // In a real app, you would fetch news from a financial news API
-  // This is a mock implementation
-  const mockNews = [
+  // Dummy news data
+  const dummyNews = [
     {
-      id: 1,
+      id: '1',
       title: 'Tech Stocks Rally as Market Shows Strong Recovery',
       source: 'Financial Times',
-      date: '2 hours ago',
-      image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
+      date: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
+      image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80',
       url: '#',
       relatedStocks: ['AAPL', 'MSFT', 'GOOGL']
     },
     {
-      id: 2,
+      id: '2',
       title: 'Federal Reserve Signals Potential Rate Cuts in 2024',
       source: 'Bloomberg',
-      date: '5 hours ago',
-      image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
+      date: new Date(Date.now() - 1000 * 60 * 120).toISOString(), // 2 hours ago
+      image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80',
       url: '#',
       relatedStocks: []
     },
     {
-      id: 3,
+      id: '3',
       title: 'Amazon Announces New AI-Powered Shopping Features',
       source: 'TechCrunch',
-      date: '8 hours ago',
-      image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
+      date: new Date(Date.now() - 1000 * 60 * 300).toISOString(), // 5 hours ago
+      image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80',
       url: '#',
       relatedStocks: ['AMZN']
     },
     {
-      id: 4,
+      id: '4',
       title: 'Microsoft Expands Cloud Services with New Data Centers',
       source: 'The Verge',
-      date: '1 day ago',
-      image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
+      date: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
+      image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80',
       url: '#',
       relatedStocks: ['MSFT']
     },
     {
-      id: 5,
+      id: '5',
       title: 'Alphabet Reports Strong Q2 Earnings, Beating Estimates',
       source: 'CNBC',
-      date: '1 day ago',
-      image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80',
+      date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(), // 2 days ago
+      image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&auto=format&fit=crop&w=1470&q=80',
       url: '#',
       relatedStocks: ['GOOGL']
     }
   ];
 
-  // Filter news based on watched stocks if any are provided
-  if (symbols.length > 0) {
-    return mockNews.filter(news => 
-      news.relatedStocks.some(symbol => symbols.includes(symbol))
-    );
+  // If specific symbols are provided, filter news by those symbols
+  if (symbols && symbols.length > 0) {
+    return dummyNews.filter(news => 
+      news.relatedStocks.some(stock => symbols.includes(stock))
+    ).map(item => ({
+      ...item,
+      date: timeAgo(item.date)
+    }));
   }
   
-  // Return all news if no specific stocks are being watched
-  return mockNews;
+  // Return all news with formatted dates if no symbols are provided
+  return dummyNews.map(item => ({
+    ...item,
+    date: timeAgo(item.date)
+  }));
 };
 
 const FinancialNews = ({ watchedStocks = [] }) => {
   const [expandedId, setExpandedId] = useState(null);
   const [showAll, setShowAll] = useState(false);
-  
-  const { data: news = [], isLoading } = useQuery({
-    queryKey: ['financialNews', watchedStocks.join(',')],
-    queryFn: () => fetchNews(watchedStocks.map(s => s.symbol || s['1. symbol'])),
+
+  const symbols = watchedStocks.map(s => s.symbol || s['1. symbol']).filter(Boolean);
+
+  const { data: news = [], isLoading, error } = useQuery({
+    queryKey: ['financialNews', symbols.join(',')],
+    queryFn: () => fetchNews(symbols),
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false
   });
 
   const displayedNews = showAll ? news : news.slice(0, 3);
+
+  if (error) {
+    console.error('Query error:', error);
+    return (
+      <div className="text-red-600 dark:text-red-400">
+        Failed to load news. Please try again later.
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -91,16 +120,16 @@ const FinancialNews = ({ watchedStocks = [] }) => {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Financial News</h3>
-        {watchedStocks.length > 0 && (
+        {symbols.length > 0 && (
           <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-1 rounded-full">
             Filtered by watchlist
           </span>
         )}
       </div>
-      
-      {news.length === 0 ? (
+
+      {(!news || news.length === 0) ? (
         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          <p>No recent news found for your watchlist</p>
+          <p>No recent news found{symbols.length > 0 ? ' for your watchlist' : ''}.</p>
         </div>
       ) : (
         <>
@@ -117,7 +146,7 @@ const FinancialNews = ({ watchedStocks = [] }) => {
                   <div className="flex items-start space-x-4">
                     <div className="flex-shrink-0 w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-md overflow-hidden">
                       <img 
-                        src={item.image} 
+                        src={item.image || 'https://via.placeholder.com/80x80?text=News'} 
                         alt={item.title} 
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -133,6 +162,7 @@ const FinancialNews = ({ watchedStocks = [] }) => {
                         </h4>
                         <button 
                           onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                          aria-expanded={expandedId === item.id}
                           className="ml-2 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-300"
                         >
                           <svg 
@@ -145,12 +175,12 @@ const FinancialNews = ({ watchedStocks = [] }) => {
                           </svg>
                         </button>
                       </div>
-                      
+
                       <div className="mt-1 flex items-center text-xs text-gray-500 dark:text-gray-400">
                         <span>{item.source}</span>
                         <span className="mx-2">•</span>
                         <span>{item.date}</span>
-                        
+
                         {item.relatedStocks && item.relatedStocks.length > 0 && (
                           <div className="ml-3 flex items-center">
                             <svg className="w-3 h-3 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -162,7 +192,7 @@ const FinancialNews = ({ watchedStocks = [] }) => {
                           </div>
                         )}
                       </div>
-                      
+
                       {expandedId === item.id && (
                         <div className="mt-2 text-sm text-gray-600 dark:text-gray-300">
                           <p className="mb-2">
@@ -187,7 +217,7 @@ const FinancialNews = ({ watchedStocks = [] }) => {
               </motion.div>
             ))}
           </div>
-          
+
           {news.length > 3 && (
             <div className="text-center pt-2">
               <button

@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { FiBarChart2, FiInfo } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
 import TechStockAnalysis from '../components/TechStockAnalysis';
 
 const TechStocks = () => {

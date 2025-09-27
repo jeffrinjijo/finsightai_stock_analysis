@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getQuote } from '../utils/fmpApi';
+import fmpApi from '../utils/fmpApi.jsxundefined;
 import { motion } from 'framer-motion';
 
 const StockWatchlist = ({ stocks, onRemove, isLoading }) => {
@@ -15,7 +15,7 @@ const StockWatchlist = ({ stocks, onRemove, isLoading }) => {
       const quotes = await Promise.all(
         watchlist.map(async (stock) => {
           try {
-            const quote = await getQuote(stock.symbol);
+            const quote = await fmpApi.getQuote(stock.symbol);
             return {
               ...stock,
               price: parseFloat(quote?.price || 0),

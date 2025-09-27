@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
 import { 
   FiRefreshCw, 
   FiAlertCircle, 
@@ -9,153 +8,335 @@ import {
   FiTrendingDown,
   FiActivity
 } from 'react-icons/fi';
-import { getQuote, getCompanyOverview } from '../utils/fmpApi';
 
-// Default stock data for major tech companies
-const DEFAULT_TECH_STOCKS = [
-  { symbol: 'AAPL', name: 'Apple Inc.', sector: 'Technology' },
-  { symbol: 'MSFT', name: 'Microsoft Corporation', sector: 'Technology' },
-  { symbol: 'GOOGL', name: 'Alphabet Inc. (Google)', sector: 'Technology' },
-  { symbol: 'AMZN', name: 'Amazon.com Inc.', sector: 'Consumer Cyclical' },
-  { symbol: 'META', name: 'Meta Platforms Inc.', sector: 'Technology' },
-  { symbol: 'TSLA', name: 'Tesla Inc.', sector: 'Consumer Cyclical' }
+// Load dummy data (extracted from your Excel sheet and converted to JSON)
+const DUMMY_STOCKS = [
+  {
+    symbol: 'AAPL',
+    name: 'Apple Inc.',
+    sector: 'Technology',
+    price: 176.50,
+    change: -1.20,
+    changePercent: -0.68,
+    volume: 89000000,
+    open: 178.00,
+    high: 179.20,
+    low: 175.80,
+    previousClose: 177.70,
+    marketCap: 2800000000000,
+    peRatio: 28.5,
+    isMarketOpen: true,
+    lastUpdated: new Date().toISOString()
+  },
+  {
+    symbol: 'MSFT',
+    name: 'Microsoft Corporation',
+    sector: 'Technology',
+    price: 325.40,
+    change: +2.50,
+    changePercent: +0.77,
+    volume: 43000000,
+    open: 323.00,
+    high: 327.00,
+    low: 322.50,
+    previousClose: 322.90,
+    marketCap: 2420000000000,
+    peRatio: 32.1,
+    isMarketOpen: true,
+    lastUpdated: new Date().toISOString()
+  },
+  {
+    symbol: 'GOOGL',
+    name: 'Alphabet Inc. (Google)',
+    sector: 'Technology',
+    price: 135.75,
+    change: +0.95,
+    changePercent: +0.70,
+    volume: 31000000,
+    open: 134.80,
+    high: 136.50,
+    low: 134.20,
+    previousClose: 134.80,
+    marketCap: 1720000000000,
+    peRatio: 29.8,
+    isMarketOpen: true,
+    lastUpdated: new Date().toISOString()
+  },
+  { 
+    symbol: 'AMZN', 
+    name: 'Amazon.com, Inc.', 
+    sector: 'Consumer Discretionary', 
+    price: 138.20, 
+    change: +1.15, 
+    changePercent: +0.84, 
+    volume: 52000000, 
+    open: 137.50, 
+    high: 139.40, 
+    low: 136.90, 
+    previousClose: 137.05, 
+    marketCap: 1410000000000, 
+    peRatio: 60.2, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'META', 
+    name: 'Meta Platforms, Inc.', 
+    sector: 'Technology', 
+    price: 305.40, 
+    change: -2.10, 
+    changePercent: -0.68, 
+    volume: 28000000, 
+    open: 308.00, 
+    high: 310.00, 
+    low: 303.00, 
+    previousClose: 307.50, 
+    marketCap: 790000000000, 
+    peRatio: 24.7, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'AVGO', 
+    name: 'Broadcom Inc.', 
+    sector: 'Technology', 
+    price: 890.75, 
+    change: +5.80, 
+    changePercent: +0.65, 
+    volume: 5000000, 
+    open: 885.00, 
+    high: 895.00, 
+    low: 880.00, 
+    previousClose: 884.95, 
+    marketCap: 370000000000, 
+    peRatio: 21.3, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'TSLA', 
+    name: 'Tesla, Inc.', 
+    sector: 'Consumer Discretionary', 
+    price: 245.10, 
+    change: +3.20, 
+    changePercent: +1.32, 
+    volume: 67000000, 
+    open: 242.00, 
+    high: 248.00, 
+    low: 240.50, 
+    previousClose: 241.90, 
+    marketCap: 780000000000, 
+    peRatio: 55.0, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'BRK.B', 
+    name: 'Berkshire Hathaway Inc.', 
+    sector: 'Financials', 
+    price: 351.80, 
+    change: -1.00, 
+    changePercent: -0.28, 
+    volume: 4800000, 
+    open: 353.00, 
+    high: 355.50, 
+    low: 350.80, 
+    previousClose: 352.80, 
+    marketCap: 780000000000, 
+    peRatio: 20.4, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'JPM', 
+    name: 'JPMorgan Chase & Co.', 
+    sector: 'Financials', 
+    price: 148.60, 
+    change: +0.75, 
+    changePercent: +0.51, 
+    volume: 12000000, 
+    open: 147.80, 
+    high: 149.90, 
+    low: 146.70, 
+    previousClose: 147.85, 
+    marketCap: 430000000000, 
+    peRatio: 12.5, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'WMT', 
+    name: 'Walmart Inc.', 
+    sector: 'Consumer Staples', 
+    price: 162.90, 
+    change: -0.30, 
+    changePercent: -0.18, 
+    volume: 8500000, 
+    open: 163.50, 
+    high: 164.20, 
+    low: 161.80, 
+    previousClose: 163.20, 
+    marketCap: 440000000000, 
+    peRatio: 25.2, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'ORCL', 
+    name: 'Oracle Corporation', 
+    sector: 'Technology', 
+    price: 115.70, 
+    change: +1.05, 
+    changePercent: +0.92, 
+    volume: 9100000, 
+    open: 114.50, 
+    high: 116.80, 
+    low: 113.90, 
+    previousClose: 114.65, 
+    marketCap: 320000000000, 
+    peRatio: 19.8, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'LLY', 
+    name: 'Eli Lilly & Co.', 
+    sector: 'Healthcare', 
+    price: 605.80, 
+    change: +4.10, 
+    changePercent: +0.68, 
+    volume: 6200000, 
+    open: 601.00, 
+    high: 610.00, 
+    low: 598.00, 
+    previousClose: 601.70, 
+    marketCap: 570000000000, 
+    peRatio: 42.3, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'V', 
+    name: 'Visa Inc.', 
+    sector: 'Financials', 
+    price: 245.30, 
+    change: +0.80, 
+    changePercent: +0.33, 
+    volume: 7500000, 
+    open: 244.00, 
+    high: 247.00, 
+    low: 243.00, 
+    previousClose: 244.50, 
+    marketCap: 510000000000, 
+    peRatio: 29.6, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'NFLX', 
+    name: 'Netflix, Inc.', 
+    sector: 'Communication Services', 
+    price: 415.20, 
+    change: -5.50, 
+    changePercent: -1.31, 
+    volume: 9200000, 
+    open: 421.00, 
+    high: 423.00, 
+    low: 413.00, 
+    previousClose: 420.70, 
+    marketCap: 180000000000, 
+    peRatio: 34.1, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'MA', 
+    name: 'Mastercard, Inc.', 
+    sector: 'Financials', 
+    price: 392.50, 
+    change: +2.20, 
+    changePercent: +0.56, 
+    volume: 6100000, 
+    open: 390.00, 
+    high: 395.00, 
+    low: 389.50, 
+    previousClose: 390.30, 
+    marketCap: 370000000000, 
+    peRatio: 30.2, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'XOM', 
+    name: 'Exxon Mobil Corporation', 
+    sector: 'Energy', 
+    price: 108.70, 
+    change: -0.60, 
+    changePercent: -0.55, 
+    volume: 19000000, 
+    open: 109.50, 
+    high: 110.20, 
+    low: 107.80, 
+    previousClose: 109.30, 
+    marketCap: 430000000000, 
+    peRatio: 10.8, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'COST', 
+    name: 'Costco Wholesale Corporation', 
+    sector: 'Consumer Staples', 
+    price: 550.90, 
+    change: +3.70, 
+    changePercent: +0.68, 
+    volume: 4200000, 
+    open: 548.00, 
+    high: 553.00, 
+    low: 546.00, 
+    previousClose: 547.20, 
+    marketCap: 250000000000, 
+    peRatio: 38.5, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  },
+  { 
+    symbol: 'JNJ', 
+    name: 'Johnson & Johnson', 
+    sector: 'Healthcare', 
+    price: 165.40, 
+    change: -1.10, 
+    changePercent: -0.66, 
+    volume: 7200000, 
+    open: 166.80, 
+    high: 167.20, 
+    low: 164.50, 
+    previousClose: 166.50, 
+    marketCap: 430000000000, 
+    peRatio: 17.2, 
+    isMarketOpen: true, 
+    lastUpdated: new Date().toISOString() 
+  }
 ];
 
-async function fetchStockData(symbol, retryCount = 0) {
-  const MAX_RETRIES = 2;
-  
-  try {
-    console.log(`[${new Date().toISOString()}] Fetching data for ${symbol} (attempt ${retryCount + 1})`);
-    
-    const [quote, overview] = await Promise.all([
-      getQuote(symbol).catch(err => {
-        console.warn(`[${new Date().toISOString()}] Failed to fetch quote for ${symbol}:`, err.message);
-        return null;
-      }),
-      getCompanyOverview(symbol).catch(err => {
-        console.warn(`[${new Date().toISOString()}] Failed to fetch overview for ${symbol}:`, err.message);
-        return null;
-      })
-    ]);
-
-    console.log(`[${new Date().toISOString()}] API Response for ${symbol}:`, { 
-      quote: quote ? 'Received' : 'Missing', 
-      overview: overview ? 'Received' : 'Missing' 
-    });
-
-    // If we got rate limited and have retries left, try again after a delay
-    if ((!quote || !overview) && retryCount < MAX_RETRIES) {
-      const delay = 1000 * (retryCount + 1);
-      console.log(`[${new Date().toISOString()}] Retrying ${symbol} (${retryCount + 1}/${MAX_RETRIES}) in ${delay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return fetchStockData(symbol, retryCount + 1);
-    }
-
-    // If we still don't have data after retries, return error
-    if (!quote || !overview) {
-      const error = new Error(`Failed to fetch complete data for ${symbol}`);
-      error.details = { quote: !!quote, overview: !!overview };
-      throw error;
-    }
-
-    const result = {
-      symbol,
-      name: overview?.companyName || overview?.name || symbol,
-      price: parseFloat(quote?.price) || 0,
-      change: parseFloat(quote?.change) || 0,
-      changePercent: parseFloat(quote?.changesPercentage) || 0,
-      volume: parseInt(quote?.volume) || 0,
-      open: parseFloat(quote?.open) || 0,
-      high: parseFloat(quote?.dayHigh) || 0,
-      low: parseFloat(quote?.dayLow) || 0,
-      previousClose: parseFloat(quote?.previousClose) || 0,
-      marketCap: overview?.mktCap ? parseInt(overview.mktCap) : 0,
-      peRatio: parseFloat(overview?.pe) || 0,
-      sector: overview?.sector || 'Technology',
-      lastUpdated: new Date().toISOString(),
-      isMarketOpen: quote?.isMarketOpen || false,
-      rawData: { quote, overview } // For debugging
-    };
-
-    console.log(`[${new Date().toISOString()}] Successfully processed data for ${symbol}:`, {
-      price: result.price,
-      change: result.change,
-      marketCap: result.marketCap,
-      peRatio: result.peRatio
-    });
-    
-    return result;
-  } catch (error) {
-    console.error(`Error in fetchStockData for ${symbol}:`, error);
-    return {
-      symbol,
-      name: symbol,
-      price: 0,
-      change: 0,
-      changePercent: 0,
-      volume: 0,
-      error: `Failed to load data for ${symbol}`,
-      lastUpdated: new Date().toISOString()
-    };
-  }
-}
-
 const TechStockAnalysis = () => {
+  const [stocks, setStocks] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [isRefreshing, setIsRefreshing] = useState(false);
-  
-  // Fetch data for all tech stocks in parallel with better error handling
-  const { data: stocks = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['techStocks', 'major-tech'],
-    queryFn: async () => {
-      console.log('Fetching stock data...');
-      setIsRefreshing(true);
-      try {
-        const results = await Promise.all(
-          DEFAULT_TECH_STOCKS.map(async (stock) => {
-            try {
-              const data = await fetchStockData(stock.symbol);
-              console.log(`Fetched ${stock.symbol}:`, data);
-              return data;
-            } catch (err) {
-              console.error(`Error fetching ${stock.symbol}:`, err);
-              return {
-                ...stock,
-                error: `Failed to load ${stock.symbol} data`,
-                lastUpdated: new Date().toISOString()
-              };
-            }
-          })
-        );
-        setLastUpdated(new Date());
-        return results;
-      } catch (error) {
-        console.error('Error in stock data query:', error);
-        throw error;
-      } finally {
-        setIsRefreshing(false);
-      }
-    },
-    refetchInterval: 300000, // 5 minutes
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
-    staleTime: 60000, // 1 minute
-    cacheTime: 300000, // 5 minutes
-    retry: 3,
-    retryDelay: 1000
-  });
+
+  useEffect(() => {
+    // Simulate loading data
+    setStocks(DUMMY_STOCKS);
+  }, []);
 
   const handleRefresh = async () => {
-    try {
-      setIsRefreshing(true);
-      await refetch();
+    setIsRefreshing(true);
+    // Simulate refresh delay
+    setTimeout(() => {
+      setStocks([...DUMMY_STOCKS]); // reload dummy data
       setLastUpdated(new Date());
-    } catch (err) {
-      console.error('Error refreshing data:', err);
-    } finally {
       setIsRefreshing(false);
-    }
+    }, 1000);
   };
 
   // Group stocks by sector
@@ -185,30 +366,11 @@ const TechStockAnalysis = () => {
     };
   }, [stocks]);
 
-  if (isLoading && !stocks.length) {
+  if (!stocks.length) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600 mb-4"></div>
         <p className="text-gray-600 dark:text-gray-400">Loading tech stock data...</p>
-      </div>
-    );
-  }
-
-  if (error && !stocks.length) {
-    return (
-      <div className="bg-red-50 dark:bg-red-900/10 p-6 rounded-lg border border-red-100 dark:border-red-900/50 text-center">
-        <FiAlertCircle className="mx-auto h-12 w-12 text-red-500" />
-        <h3 className="mt-2 text-lg font-medium text-red-800 dark:text-red-200">Error Loading Data</h3>
-        <p className="mt-1 text-sm text-red-700 dark:text-red-300">
-          Failed to load stock data. Please check your internet connection and try again.
-        </p>
-        <button
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isRefreshing ? 'Refreshing...' : 'Retry'}
-        </button>
       </div>
     );
   }
@@ -223,11 +385,9 @@ const TechStockAnalysis = () => {
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Real-time analysis of major technology stocks
-            {lastUpdated && (
-              <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-                (Updated: {lastUpdated.toLocaleTimeString()})
-              </span>
-            )}
+            <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+              (Updated: {lastUpdated.toLocaleTimeString()})
+            </span>
           </p>
         </div>
         <button
@@ -350,18 +510,16 @@ const TechStockAnalysis = () => {
                       <span className="text-2xl font-semibold text-gray-900 dark:text-white">
                         ${stock.price ? stock.price.toFixed(2) : 'N/A'}
                       </span>
-                      {typeof stock.change === 'number' && typeof stock.changePercent === 'number' && (
-                        <span 
-                          className={`ml-2 text-sm font-medium ${
-                            stock.change >= 0 
-                              ? 'text-green-600 dark:text-green-400' 
-                              : 'text-red-600 dark:text-red-400'
-                          }`}
-                        >
-                          {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} 
-                          ({stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)
-                        </span>
-                      )}
+                      <span 
+                        className={`ml-2 text-sm font-medium ${
+                          stock.change >= 0 
+                            ? 'text-green-600 dark:text-green-400' 
+                            : 'text-red-600 dark:text-red-400'
+                        }`}
+                      >
+                        {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)} 
+                        ({stock.changePercent >= 0 ? '+' : ''}{stock.changePercent.toFixed(2)}%)
+                      </span>
                     </div>
                     
                     <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
@@ -394,24 +552,20 @@ const TechStockAnalysis = () => {
                       <div>
                         <p className="text-gray-500 dark:text-gray-400">Day Range</p>
                         <p className="font-medium text-gray-900 dark:text-white">
-                          {stock.low && stock.high 
-                            ? `$${(stock.low || 0).toFixed(2)} - $${(stock.high || 0).toFixed(2)}`
-                            : 'N/A'}
+                          ${stock.low.toFixed(2)} - ${stock.high.toFixed(2)}
                         </p>
                       </div>
                     </div>
                     
-                    {stock.isMarketOpen !== undefined && (
-                      <div className="mt-3 text-xs">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          stock.isMarketOpen 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' 
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200'
-                        }`}>
-                          {stock.isMarketOpen ? 'Market Open' : 'Market Closed'}
-                        </span>
-                      </div>
-                    )}
+                    <div className="mt-3 text-xs">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        stock.isMarketOpen 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' 
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200'
+                      }`}>
+                        {stock.isMarketOpen ? 'Market Open' : 'Market Closed'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -433,8 +587,7 @@ const TechStockAnalysis = () => {
               </h3>
               <div className="mt-2 text-sm text-gray-700 dark:text-gray-300 space-y-2">
                 <p>
-                  Data is provided by Financial Modeling Prep API and is delayed by up to 15 minutes.
-                  Stock prices and other market data may not be in real-time.
+                  Data is provided for demonstration purposes. Stock prices and other market data are not in real-time.
                 </p>
                 <p>
                   Last updated: {lastUpdated.toLocaleString()}

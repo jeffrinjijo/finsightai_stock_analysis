@@ -38,52 +38,18 @@ const StockCard = ({ ticker, name, change, price, sector, delay }) => {
   );
 };
 
-export default function FomoStocks() {
-  const trendingStocks = [
-    {
-      ticker: "TSLA",
-      name: "Tesla, Inc.",
-      price: 876.75,
-      change: 5.3,
-      sector: "Auto"
-    },
-    {
-      ticker: "NVDA",
-      name: "NVIDIA Corporation",
-      price: 298.21,
-      change: -1.2,
+export default function FomoStocks({ stocksData = [], isLoading = false }) {
+  // Transform the stocks data to match the component's expected format
+  const trendingStocks = stocksData
+    .filter(stock => stock && stock.symbol && stock.name)
+    .map(stock => ({
+      ticker: stock.symbol,
+      name: stock.name,
+      price: stock.currentPrice || 0,
+      change: stock.changePercent || 0,
       sector: "Tech"
-    },
-    {
-      ticker: "GME",
-      name: "GameStop Corp.",
-      price: 145.12,
-      change: 12.7,
-      sector: "Retail"
-    },
-    // SaaS Stocks
-    {
-      ticker: "CRM",
-      name: "Salesforce, Inc.",
-      price: 245.67,
-      change: 3.2,
-      sector: "SaaS"
-    },
-    {
-      ticker: "SHOP",
-      name: "Shopify Inc.",
-      price: 1450.32,
-      change: -2.1,
-      sector: "SaaS"
-    },
-    {
-      ticker: "NOW",
-      name: "ServiceNow, Inc.",
-      price: 678.90,
-      change: 1.8,
-      sector: "SaaS"
-    }
-  ];
+    }))
+    .slice(0, 6); // Show top 6 stocks
 
   return (
     <div className="space-y-4 w-full">
